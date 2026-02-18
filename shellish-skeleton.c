@@ -364,15 +364,15 @@ int process_command(struct command_t *command) {
 
        if (command->redirects[2] != NULL) {
         // handle redirection
-        int fd_out = open(command->redirects[2],
+        int fd_append = open(command->redirects[2],
               O_WRONLY | O_CREAT | O_APPEND,
               0644); // open append file
-        if (fd_out < 0) {
+        if (fd_append < 0) {
           perror("open append file error");
           exit(1);
         }
-        dup2(fd_out, STDOUT_FILENO); // duplicate the file descriptor
-        close(fd_out); // close the file descriptor
+        dup2(fd_append, STDOUT_FILENO); // duplicate the file descriptor
+        close(fd_append); // close the file descriptor
       }
     
     char *path_env = getenv("PATH");   // get the path environment variable
