@@ -338,6 +338,43 @@ int process_command(struct command_t *command) {
     // do so by replacing the execvp call below
     //execvp(command->name, command->args); // exec+args+path
 
+    if (command->redirects[0] != NULL) {
+      // handle redirection
+        int fd_in = open(command->redirects[0], O_RDONLY); // open input file
+        if (fd_in < 0) {
+          perror("open input file error");
+          exit(1);
+        }
+        dup2(fd_in, STDIN_FILENO); // duplicate the file descriptor
+        close(fd_in); // close the file descriptor
+      }
+
+      if (command->redirects[1] != NULL) {
+        // handle redirection
+        int fd_out = open(command->redirects[1],
+              O_WRONLY | O_CREAT | O_TRUNC,
+              0644); // open output file
+        if (fd_out < 0) {
+          perror("open output file error");
+          exit(1);
+        }
+        dup2(fd_out, STDOUT_FILENO); // duplicate the file descriptor
+        close(fd_out); // close the file descriptor
+      }
+
+       if (command->redirects[2] != NULL) {
+        // handle redirection
+        int fd_out = open(command->redirects[2],
+              O_WRONLY | O_CREAT | O_APPEND,
+              0644); // open append file
+        if (fd_out < 0) {
+          perror("open append file error");
+          exit(1);
+        }
+        dup2(fd_out, STDOUT_FILENO); // duplicate the file descriptor
+        close(fd_out); // close the file descriptor
+      }
+    
     char *path_env = getenv("PATH");   // get the path environment variable
     char *path_copy = strdup(path_env); // copy the path environment variable
     char *token = strtok(path_copy, ":"); // token changes on each call, so we used a copy of path_env
@@ -363,8 +400,8 @@ int process_command(struct command_t *command) {
   } else {
     // TODO: implement background processes here
     // wait(0);
-    if (!command->background) {
-      waitpid(pid, NULL, 0); 
+    if (!command->background) { // if the command is not in background, wait for it to finish
+      waitpid(pid, NULL, 0); // wait for the child process to finish
     }; 
     return SUCCESS; 
 }
