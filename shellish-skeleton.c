@@ -308,6 +308,8 @@ int prompt(struct command_t *command) {
 
 int process_command(struct command_t *command) {
   int r;
+  int pipefd[2];
+
   if (strcmp(command->name, "") == 0)
     return SUCCESS;
 
@@ -321,6 +323,43 @@ int process_command(struct command_t *command) {
         printf("-%s: %s: %s\n", sysname, command->name, strerror(errno));
       return SUCCESS;
     }
+  }
+
+  if (command->next != NULL) { // pipe logic
+    if (pipe(pipefd) < 0) { // pipe creation
+            perror("Pipe failed");
+            return SUCCESS;
+        }
+
+    pid_t pid1 = fork(); // fork for left child
+    if (pid1 == 0) { // left child
+        dup2(pipefd[1], STDOUT_FILENO); // redirect stdout to pipe
+        close(pipefd[0]); // close unused pipe end
+        close(pipefd[1]);
+	
+	      command->next = NULL;
+
+        process_command(command);  // left command
+        exit(0);
+    }
+
+    pid_t pid2 = fork(); // fork for right child
+    if (pid2 == 0) { // right child
+        dup2(pipefd[0], STDIN_FILENO); // redirect stdin to pipe
+        close(pipefd[1]);
+        close(pipefd[0]);
+
+        process_command(command->next); // right command
+        exit(0);
+    }
+
+    close(pipefd[0]); // close unused pipe ends
+    close(pipefd[1]);
+
+    waitpid(pid1, NULL, 0); // wait for children
+    waitpid(pid2, NULL, 0);
+
+    return SUCCESS;
   }
 
   pid_t pid = fork();
@@ -404,7 +443,9 @@ int process_command(struct command_t *command) {
       waitpid(pid, NULL, 0); // wait for the child process to finish
     }; 
     return SUCCESS; 
+  }
 }
+
 int main() {
   while (1) {
     struct command_t *command =
