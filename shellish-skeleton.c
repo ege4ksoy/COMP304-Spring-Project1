@@ -6,7 +6,13 @@
 #include <sys/wait.h>
 #include <termios.h> // termios, TCSANOW, ECHO, ICANON
 #include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 const char *sysname = "shellish";
+
+// forward declaration for handle_cut (defined in my_cut.c)
+void handle_cut(int argc, char *argv[]);
 
 enum return_codes {
   SUCCESS = 0,
@@ -346,7 +352,7 @@ int process_command(struct command_t *command) {
     pid_t pid2 = fork(); // fork for right child
     if (pid2 == 0) { // right child
         dup2(pipefd[0], STDIN_FILENO); // redirect stdin to pipe
-        close(pipefd[1]);
+        close(pipefd[1]); // close unused pipe end
         close(pipefd[0]);
 
         process_command(command->next); // right command
@@ -360,6 +366,39 @@ int process_command(struct command_t *command) {
     waitpid(pid2, NULL, 0);
 
     return SUCCESS;
+  }
+
+  // handle custom built-in commands that need to run in a child process
+  // (so they support piping and redirection)
+  if (strcmp(command->name, "cut") == 0) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      // handle redirections
+      if (command->redirects[0] != NULL) {
+        int fd_in = open(command->redirects[0], O_RDONLY);
+        if (fd_in < 0) { perror("open input file error"); exit(1); }
+        dup2(fd_in, STDIN_FILENO);
+        close(fd_in);
+      }
+      if (command->redirects[1] != NULL) {
+        int fd_out = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd_out < 0) { perror("open output file error"); exit(1); }
+        dup2(fd_out, STDOUT_FILENO);
+        close(fd_out);
+      }
+      if (command->redirects[2] != NULL) {
+        int fd_append = open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd_append < 0) { perror("open append file error"); exit(1); }
+        dup2(fd_append, STDOUT_FILENO);
+        close(fd_append);
+      }
+      handle_cut(command->arg_count, command->args);
+      exit(0);
+    } else {
+      if (!command->background)
+        waitpid(pid, NULL, 0);
+      return SUCCESS;
+    }
   }
 
   pid_t pid = fork();
