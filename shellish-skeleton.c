@@ -1,18 +1,20 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <termios.h> // termios, TCSANOW, ECHO, ICANON
 #include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 const char *sysname = "shellish";
 
 // forward declaration for handle_cut (defined in my_cut.c)
 void handle_cut(int argc, char *argv[]);
+int chatroom(int argc, char *argv[]);
+void handle_process_tree(int argc, char *argv[]);
 
 enum return_codes {
   SUCCESS = 0,
@@ -332,31 +334,31 @@ int process_command(struct command_t *command) {
   }
 
   if (command->next != NULL) { // pipe logic
-    if (pipe(pipefd) < 0) { // pipe creation
-            perror("Pipe failed");
-            return SUCCESS;
-        }
-
-    pid_t pid1 = fork(); // fork for left child
-    if (pid1 == 0) { // left child
-        dup2(pipefd[1], STDOUT_FILENO); // redirect stdout to pipe
-        close(pipefd[0]); // close unused pipe end
-        close(pipefd[1]);
-	
-	      command->next = NULL;
-
-        process_command(command);  // left command
-        exit(0);
+    if (pipe(pipefd) < 0) {    // pipe creation
+      perror("Pipe failed");
+      return SUCCESS;
     }
 
-    pid_t pid2 = fork(); // fork for right child
-    if (pid2 == 0) { // right child
-        dup2(pipefd[0], STDIN_FILENO); // redirect stdin to pipe
-        close(pipefd[1]); // close unused pipe end
-        close(pipefd[0]);
+    pid_t pid1 = fork();              // fork for left child
+    if (pid1 == 0) {                  // left child
+      dup2(pipefd[1], STDOUT_FILENO); // redirect stdout to pipe
+      close(pipefd[0]);               // close unused pipe end
+      close(pipefd[1]);
 
-        process_command(command->next); // right command
-        exit(0);
+      command->next = NULL;
+
+      process_command(command); // left command
+      exit(0);
+    }
+
+    pid_t pid2 = fork();             // fork for right child
+    if (pid2 == 0) {                 // right child
+      dup2(pipefd[0], STDIN_FILENO); // redirect stdin to pipe
+      close(pipefd[1]);              // close unused pipe end
+      close(pipefd[0]);
+
+      process_command(command->next); // right command
+      exit(0);
     }
 
     close(pipefd[0]); // close unused pipe ends
@@ -376,23 +378,58 @@ int process_command(struct command_t *command) {
       // handle redirections
       if (command->redirects[0] != NULL) {
         int fd_in = open(command->redirects[0], O_RDONLY);
-        if (fd_in < 0) { perror("open input file error"); exit(1); }
+        if (fd_in < 0) {
+          perror("open input file error");
+          exit(1);
+        }
         dup2(fd_in, STDIN_FILENO);
         close(fd_in);
       }
       if (command->redirects[1] != NULL) {
-        int fd_out = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
-        if (fd_out < 0) { perror("open output file error"); exit(1); }
+        int fd_out =
+            open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd_out < 0) {
+          perror("open output file error");
+          exit(1);
+        }
         dup2(fd_out, STDOUT_FILENO);
         close(fd_out);
       }
       if (command->redirects[2] != NULL) {
-        int fd_append = open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644);
-        if (fd_append < 0) { perror("open append file error"); exit(1); }
+        int fd_append =
+            open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (fd_append < 0) {
+          perror("open append file error");
+          exit(1);
+        }
         dup2(fd_append, STDOUT_FILENO);
         close(fd_append);
       }
       handle_cut(command->arg_count, command->args);
+      exit(0);
+    } else {
+      if (!command->background)
+        waitpid(pid, NULL, 0);
+      return SUCCESS;
+    }
+  }
+
+  if (strcmp(command->name, "chatroom") == 0) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      chatroom(command->arg_count, command->args);
+      exit(0);
+    } else {
+      if (!command->background)
+        waitpid(pid, NULL, 0);
+      return SUCCESS;
+    }
+  }
+
+  if (strcmp(command->name, "process_tree") == 0) {
+    pid_t pid = fork();
+    if (pid == 0) {
+      handle_process_tree(command->arg_count, command->args);
       exit(0);
     } else {
       if (!command->background)
@@ -414,58 +451,59 @@ int process_command(struct command_t *command) {
 
     // TODO: do your own exec with path resolving using execv()
     // do so by replacing the execvp call below
-    //execvp(command->name, command->args); // exec+args+path
+    // execvp(command->name, command->args); // exec+args+path
 
     if (command->redirects[0] != NULL) {
       // handle redirection
-        int fd_in = open(command->redirects[0], O_RDONLY); // open input file
-        if (fd_in < 0) {
-          perror("open input file error");
-          exit(1);
-        }
-        dup2(fd_in, STDIN_FILENO); // duplicate the file descriptor
-        close(fd_in); // close the file descriptor
+      int fd_in = open(command->redirects[0], O_RDONLY); // open input file
+      if (fd_in < 0) {
+        perror("open input file error");
+        exit(1);
       }
+      dup2(fd_in, STDIN_FILENO); // duplicate the file descriptor
+      close(fd_in);              // close the file descriptor
+    }
 
-      if (command->redirects[1] != NULL) {
-        // handle redirection
-        int fd_out = open(command->redirects[1],
-              O_WRONLY | O_CREAT | O_TRUNC,
-              0644); // open output file
-        if (fd_out < 0) {
-          perror("open output file error");
-          exit(1);
-        }
-        dup2(fd_out, STDOUT_FILENO); // duplicate the file descriptor
-        close(fd_out); // close the file descriptor
+    if (command->redirects[1] != NULL) {
+      // handle redirection
+      int fd_out = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC,
+                        0644); // open output file
+      if (fd_out < 0) {
+        perror("open output file error");
+        exit(1);
       }
+      dup2(fd_out, STDOUT_FILENO); // duplicate the file descriptor
+      close(fd_out);               // close the file descriptor
+    }
 
-       if (command->redirects[2] != NULL) {
-        // handle redirection
-        int fd_append = open(command->redirects[2],
-              O_WRONLY | O_CREAT | O_APPEND,
-              0644); // open append file
-        if (fd_append < 0) {
-          perror("open append file error");
-          exit(1);
-        }
-        dup2(fd_append, STDOUT_FILENO); // duplicate the file descriptor
-        close(fd_append); // close the file descriptor
+    if (command->redirects[2] != NULL) {
+      // handle redirection
+      int fd_append = open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND,
+                           0644); // open append file
+      if (fd_append < 0) {
+        perror("open append file error");
+        exit(1);
       }
-    
-    char *path_env = getenv("PATH");   // get the path environment variable
+      dup2(fd_append, STDOUT_FILENO); // duplicate the file descriptor
+      close(fd_append);               // close the file descriptor
+    }
+
+    char *path_env = getenv("PATH");    // get the path environment variable
     char *path_copy = strdup(path_env); // copy the path environment variable
-    char *token = strtok(path_copy, ":"); // token changes on each call, so we used a copy of path_env
+    char *token = strtok(
+        path_copy,
+        ":"); // token changes on each call, so we used a copy of path_env
 
     char full_path[1024]; // buffer to store the full path of the command
-    int found = 0; // flag to check if the command was found
+    int found = 0;        // flag to check if the command was found
     while (token != NULL) {
-      snprintf(full_path, sizeof(full_path), "%s/%s", token, command->name); // concatenate the token and the command name
+      snprintf(full_path, sizeof(full_path), "%s/%s", token,
+               command->name); // concatenate the token and the command name
 
       if (access(full_path, X_OK) == 0) { // check if the command is executable
-        execv(full_path, command->args); // execute the command
-        perror("execv failed"); // print error message if execv fails
-        exit(127);  
+        execv(full_path, command->args);  // execute the command
+        perror("execv failed");           // print error message if execv fails
+        exit(127);
         found = 1;
         break;
       }
@@ -478,11 +516,13 @@ int process_command(struct command_t *command) {
   } else {
     // TODO: implement background processes here
     // wait(0);
-    if (!command->background) { // if the command is not in background, wait for it to finish
-      waitpid(pid, NULL, 0); // wait for the child process to finish
-    }; 
-    return SUCCESS; 
+    if (!command->background) { // if the command is not in background, wait for
+                                // it to finish
+      waitpid(pid, NULL, 0);    // wait for the child process to finish
+    };
+    return SUCCESS;
   }
+  return SUCCESS;
 }
 
 int main() {
