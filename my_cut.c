@@ -6,6 +6,16 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/**
+ * handle_cut — main entry point for the cut command.
+ *
+ * Expected arguments (passed through the shell):
+ *   argv[1] = delimiter   — delimiter character
+ *   argv[2] = fields      — fields to print
+ *
+ * @param argc  Argument count (must be >= 2).
+ * @param argv  Argument vector.
+ */
 void handle_cut(int argc, char *argv[]) {
   char delimiter = '\t'; // default TAB
   int fields[100];       // field list

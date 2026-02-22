@@ -17,6 +17,13 @@ typedef struct {
 /* ─── /proc Scanning ─── */
 
 // Reads PID, PPID and process name from /proc/<pid>/status
+/**
+ * read_proc_status — main entry point for the read_proc_status command.
+ *
+ * @param pid_str  PID string.
+ * @param info     Pointer to proc_info_t structure to store the result.
+ * @return         0 on success, -1 on error.
+ */
 static int read_proc_status(const char *pid_str, proc_info_t *info) {
   char path[512];
   snprintf(path, sizeof(path), "/proc/%s/status", pid_str);
@@ -48,6 +55,12 @@ static int read_proc_status(const char *pid_str, proc_info_t *info) {
 }
 
 // Scans all numeric directories under /proc to build the process list
+/**
+ * read_all_procs — main entry point for the read_all_procs command.
+ *
+ * @param procs  Pointer to array of proc_info_t structures to store the result.
+ * @return       Number of processes read, or 0 on error.
+ */
 static int read_all_procs(proc_info_t *procs) {
   DIR *dir = opendir("/proc");
   if (!dir) {
@@ -74,6 +87,15 @@ static int read_all_procs(proc_info_t *procs) {
 /* ─── Tree Rendering ─── */
 
 // Draws the tree using Unicode box-drawing characters
+/**
+ * print_tree — main entry point for the print_tree command.
+ *
+ * @param root_pid  PID of the root process.
+ * @param depth     Current depth of the tree.
+ * @param is_last   Array of booleans indicating if a node is the last child.
+ * @param procs     Array of proc_info_t structures.
+ * @param count     Number of processes in the array.
+ */
 static void print_tree(int root_pid, int depth, int *is_last,
                        proc_info_t *procs, int count) {
   // Find the root node
@@ -123,6 +145,12 @@ static void print_tree(int root_pid, int depth, int *is_last,
 
 /* ─── Main Entry Point ─── */
 
+/**
+ * handle_process_tree — main entry point for the handle_process_tree command.
+ *
+ * @param argc  Argument count (must be >= 1).
+ * @param argv  Argument vector.
+ */
 void handle_process_tree(int argc, char *argv[]) {
   int root_pid = 1; // default: full tree from PID 1
   int show_me = 0;
