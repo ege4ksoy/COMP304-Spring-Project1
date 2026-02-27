@@ -230,7 +230,7 @@ int chatroom(int argc, char *argv[]) {
           char target_pipe[1024];
           snprintf(target_pipe, sizeof(target_pipe), "%s/%s", room_path,
                    entry->d_name);
-
+                   
           /* O_WRONLY | O_NONBLOCK: fail immediately if no reader */
           int fd_target = open(target_pipe, O_WRONLY | O_NONBLOCK);
           if (fd_target < 0) {

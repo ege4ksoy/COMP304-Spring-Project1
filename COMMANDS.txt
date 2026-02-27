@@ -1,0 +1,52 @@
+USED MATERIALS OR AI MODELS 
+
+1)
+https://youtu.be/2hba3etpoJg?si=fH-U9O4SGdUQX4aD
+https://youtu.be/8Q9CPWuRC6o?si=NOwFU4SzN9kPma72
+https://www.geeksforgeeks.org/cpp/named-pipe-fifo-example-c-program/
+
+
+2)
+{"textBlock":{"content":"    free(path_copy); // free the copied path","fileLineRange":{"absoluteUri":"file:///c%3A/Users/aksoy/GitHub/K/COMP304-Spring-Project1/shellish-skeleton.c","startLine":362,"endLine":362}}} do we need this line?
+
+3)
+Can you explain the error please, I  cannot compile:
+[eaksoy22@linux06 Comp304]$ gcc -o shell-ish shellish-skeleton.c
+shellish-skeleton.c: In function ‘free_command’:
+shellish-skeleton.c:62:5: error: ‘for’ loop initial declarations are only allowed in C99 mode 
+     for (int i = 0; i < command->arg_count; ++i)
+     ^
+shellish-skeleton.c:62:5: note: use option -std=c99 or -std=gnu99 to compile your code        
+shellish-skeleton.c:66:3: error: ‘for’ loop initial declarations are only allowed in C99 mode 
+   for (int i = 0; i < 3; ++i)
+   ^
+shellish-skeleton.c: In function ‘parse_command’:
+shellish-skeleton.c:206:3: error: ‘for’ loop initial declarations are only allowed in C99 mode
+   for (int i = command->arg_count - 2; i > 0; --i)
+
+4)
+when I enter this in terminal : eaksoy22@linux06:/Users/eaksoy22/Comp304 shellish$ cat output.txt | cut -d ":" -f1,6  it is not printing anything?
+
+5)
+pipe mantığı command lerde nasıl çalışır yani ls | less dediğimde ne olur?
+
+
+6)
+bana tavsiye verebilir misin, Kendimize ait custom command yazmamız isteniyor:
+
+Custom Command (Can be written in any language): The last command is any new
+
+Shell-ish command of your choice. Come up with a new command that is not too trivial and
+
+implement it inside of Shell-ish. Be creative. Selected commands will be shared with your
+
+peers in the class. Note that many commands you come up with may have been already
+
+implemented in Unix. That should not stop you from implementing your own. Create a
+
+README.md explaining your command and some sample usage.
+
+
+7)
+Can you write a README describing how to use my shell. Make sure
+to include your repo-link here as well. also add more comments on chatroom.c file

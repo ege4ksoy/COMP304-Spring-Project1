@@ -377,39 +377,39 @@ int process_command(struct command_t *command) {
     if (pid == 0) {
       // handle redirections
       if (command->redirects[0] != NULL) {
-        int fd_in = open(command->redirects[0], O_RDONLY);
+        int fd_in = open(command->redirects[0], O_RDONLY); // check if file exists and is readable
         if (fd_in < 0) {
-          perror("open input file error");
+          perror("open input file error"); // check if file exists and is readable
           exit(1);
         }
-        dup2(fd_in, STDIN_FILENO);
-        close(fd_in);
+        dup2(fd_in, STDIN_FILENO); // duplicate the file descriptor to stdin
+        close(fd_in);              // close the file descriptor
       }
       if (command->redirects[1] != NULL) {
         int fd_out =
-            open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // check if file exists and is writable
         if (fd_out < 0) {
-          perror("open output file error");
+          perror("open output file error"); // check if file exists and is writable
           exit(1);
         }
-        dup2(fd_out, STDOUT_FILENO);
-        close(fd_out);
+        dup2(fd_out, STDOUT_FILENO); // duplicate the file descriptor to stdout
+        close(fd_out);               // close the file descriptor
       }
       if (command->redirects[2] != NULL) {
         int fd_append =
-            open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644);
+            open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644); // check if file exists and is writable
         if (fd_append < 0) {
-          perror("open append file error");
+          perror("open append file error"); // check if file exists and is writable
           exit(1);
         }
-        dup2(fd_append, STDOUT_FILENO);
-        close(fd_append);
+        dup2(fd_append, STDOUT_FILENO); // duplicate the file descriptor to stdout
+        close(fd_append);               // close the file descriptor
       }
-      handle_cut(command->arg_count, command->args);
+      handle_cut(command->arg_count, command->args); // execute the cut command
       exit(0);
     } else {
       if (!command->background)
-        waitpid(pid, NULL, 0);
+        waitpid(pid, NULL, 0); // wait for the child process to finish
       return SUCCESS;
     }
   }
@@ -417,11 +417,11 @@ int process_command(struct command_t *command) {
   if (strcmp(command->name, "chatroom") == 0) {
     pid_t pid = fork();
     if (pid == 0) {
-      chatroom(command->arg_count, command->args);
+      chatroom(command->arg_count, command->args); // execute the chatroom command
       exit(0);
     } else {
       if (!command->background)
-        waitpid(pid, NULL, 0);
+        waitpid(pid, NULL, 0); // wait for the child process to finish
       return SUCCESS;
     }
   }
@@ -429,11 +429,11 @@ int process_command(struct command_t *command) {
   if (strcmp(command->name, "process_tree") == 0) {
     pid_t pid = fork();
     if (pid == 0) {
-      handle_process_tree(command->arg_count, command->args);
+      handle_process_tree(command->arg_count, command->args); // execute the process_tree command
       exit(0);
     } else {
       if (!command->background)
-        waitpid(pid, NULL, 0);
+        waitpid(pid, NULL, 0); // wait for the child process to finish
       return SUCCESS;
     }
   }
@@ -490,35 +490,30 @@ int process_command(struct command_t *command) {
 
     char *path_env = getenv("PATH");    // get the path environment variable
     char *path_copy = strdup(path_env); // copy the path environment variable
-    char *token = strtok(
-        path_copy,
-        ":"); // token changes on each call, so we used a copy of path_env
+    char *token = strtok(path_copy, ":"); // token changes on each call, so we used a copy of path_env
 
     char full_path[1024]; // buffer to store the full path of the command
-    int found = 0;        // flag to check if the command was found
     while (token != NULL) {
-      snprintf(full_path, sizeof(full_path), "%s/%s", token,
-               command->name); // concatenate the token and the command name
+      snprintf(full_path, sizeof(full_path), "%s/%s", token, command->name); // concatenate the token and the command name
 
       if (access(full_path, X_OK) == 0) { // check if the command is executable
-        execv(full_path, command->args);  // execute the command
-        perror("execv failed");           // print error message if execv fails
+        free(path_copy);                   // free before exec replaces process
+        execv(full_path, command->args);   // execute the command
+        perror("execv failed");            // print error message if execv fails
         exit(127);
-        found = 1;
-        break;
       }
       token = strtok(NULL, ":"); // get the next token
     }
-    if (!found) {
-      printf("-%s: %s: command not found\n", sysname, command->name);
-      exit(127);
-    }
+    free(path_copy); // free the copied path before exiting
+    printf("-%s: %s: command not found\n", sysname, command->name);
+    exit(127);
   } else {
     // TODO: implement background processes here
     // wait(0);
-    if (!command->background) { // if the command is not in background, wait for
-                                // it to finish
+    if (!command->background) { // if the command is not in background, wait for it to finish
+      printf("Waiting for child process to finish\n");
       waitpid(pid, NULL, 0);    // wait for the child process to finish
+      printf("DONE\n");
     };
     return SUCCESS;
   }
