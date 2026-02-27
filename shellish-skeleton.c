@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +10,16 @@
 #include <sys/wait.h>
 #include <termios.h> // termios, TCSANOW, ECHO, ICANON
 #include <unistd.h>
+
+// Signal handler to reap zombie background processes
+void sigchld_handler(int sig) {
+  (void)sig;
+  pid_t pid;
+  // Reap all finished child processes (non-blocking)
+  while ((pid = waitpid(-1, NULL, WNOHANG)) > 0) {
+    printf("\nDONE [%d]\n", pid);
+  }
+}
 const char *sysname = "shellish";
 
 // forward declaration for handle_cut (defined in my_cut.c)
@@ -292,7 +303,7 @@ int prompt(struct command_t *command) {
 
     putchar(c); // echo the character
     buf[index++] = c;
-    if (index >= sizeof(buf) - 1)
+    if (index >= (int)(sizeof(buf)) - 1)
       break;
     if (c == '\n') // enter key
       break;
@@ -379,17 +390,19 @@ int process_command(struct command_t *command) {
       if (command->redirects[0] != NULL) {
         int fd_in = open(command->redirects[0], O_RDONLY); // check if file exists and is readable
         if (fd_in < 0) {
-          perror("open input file error"); // check if file exists and is readable
+          perror(
+              "open input file error"); // check if file exists and is readable
           exit(1);
         }
         dup2(fd_in, STDIN_FILENO); // duplicate the file descriptor to stdin
         close(fd_in);              // close the file descriptor
       }
       if (command->redirects[1] != NULL) {
-        int fd_out =
-            open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // check if file exists and is writable
+        int fd_out = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC,
+                          0644); // check if file exists and is writable
         if (fd_out < 0) {
-          perror("open output file error"); // check if file exists and is writable
+          perror(
+              "open output file error"); // check if file exists and is writable
           exit(1);
         }
         dup2(fd_out, STDOUT_FILENO); // duplicate the file descriptor to stdout
@@ -397,13 +410,16 @@ int process_command(struct command_t *command) {
       }
       if (command->redirects[2] != NULL) {
         int fd_append =
-            open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644); // check if file exists and is writable
+            open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND,
+                 0644); // check if file exists and is writable
         if (fd_append < 0) {
-          perror("open append file error"); // check if file exists and is writable
+          perror(
+              "open append file error"); // check if file exists and is writable
           exit(1);
         }
-        dup2(fd_append, STDOUT_FILENO); // duplicate the file descriptor to stdout
-        close(fd_append);               // close the file descriptor
+        dup2(fd_append,
+             STDOUT_FILENO); // duplicate the file descriptor to stdout
+        close(fd_append);    // close the file descriptor
       }
       handle_cut(command->arg_count, command->args); // execute the cut command
       exit(0);
@@ -417,7 +433,8 @@ int process_command(struct command_t *command) {
   if (strcmp(command->name, "chatroom") == 0) {
     pid_t pid = fork();
     if (pid == 0) {
-      chatroom(command->arg_count, command->args); // execute the chatroom command
+      chatroom(command->arg_count,
+               command->args); // execute the chatroom command
       exit(0);
     } else {
       if (!command->background)
@@ -466,8 +483,7 @@ int process_command(struct command_t *command) {
 
     if (command->redirects[1] != NULL) {
       // handle redirection
-      int fd_out = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC,
-                        0644); // open output file
+      int fd_out = open(command->redirects[1], O_WRONLY | O_CREAT | O_TRUNC, 0644); // open output file
       if (fd_out < 0) {
         perror("open output file error");
         exit(1);
@@ -478,8 +494,7 @@ int process_command(struct command_t *command) {
 
     if (command->redirects[2] != NULL) {
       // handle redirection
-      int fd_append = open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND,
-                           0644); // open append file
+      int fd_append = open(command->redirects[2], O_WRONLY | O_CREAT | O_APPEND, 0644); // open append file
       if (fd_append < 0) {
         perror("open append file error");
         exit(1);
@@ -497,9 +512,9 @@ int process_command(struct command_t *command) {
       snprintf(full_path, sizeof(full_path), "%s/%s", token, command->name); // concatenate the token and the command name
 
       if (access(full_path, X_OK) == 0) { // check if the command is executable
-        free(path_copy);                   // free before exec replaces process
-        execv(full_path, command->args);   // execute the command
-        perror("execv failed");            // print error message if execv fails
+        free(path_copy);                  // free before exec replaces process
+        execv(full_path, command->args);  // execute the command
+        perror("execv failed");           // print error message if execv fails
         exit(127);
       }
       token = strtok(NULL, ":"); // get the next token
@@ -511,9 +526,7 @@ int process_command(struct command_t *command) {
     // TODO: implement background processes here
     // wait(0);
     if (!command->background) { // if the command is not in background, wait for it to finish
-      printf("Waiting for child process to finish\n");
       waitpid(pid, NULL, 0);    // wait for the child process to finish
-      printf("DONE\n");
     };
     return SUCCESS;
   }
@@ -521,6 +534,9 @@ int process_command(struct command_t *command) {
 }
 
 int main() {
+  // Register signal handler to automatically reap zombie background processes
+  signal(SIGCHLD, sigchld_handler);
+
   while (1) {
     struct command_t *command =
         (struct command_t *)malloc(sizeof(struct command_t));

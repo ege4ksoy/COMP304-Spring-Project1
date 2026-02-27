@@ -50,3 +50,16 @@ README.md explaining your command and some sample usage.
 7)
 Can you write a README describing how to use my shell. Make sure
 to include your repo-link here as well. also add more comments on chatroom.c file
+
+
+8)
+background procdure ü nasıl deneyebilirim
+zombie process i nasıl engellerim,
+
+
+9) 
+can you explain this error?
+shellish-skeleton.c: In function ‘prompt’:
+shellish-skeleton.c:306:15: warning: comparison of integer expressions of different signedness: ‘int’ and ‘long unsigned int’ [-Wsign-compare]
+  306 |     if (index >= sizeof(buf) - 1)
+      |               ^~

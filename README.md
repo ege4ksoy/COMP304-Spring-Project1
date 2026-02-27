@@ -8,10 +8,18 @@ A custom Unix shell written in C that supports built-in commands, piping, I/O re
 
 ## Building
 
-Compile all source files together with `gcc`:
+Use the provided `Makefile` to compile:
 
 ```bash
-gcc -o shellish shellish-skeleton.c my_cut.c chatroom.c process_tree.c -Wall
+make            # Build the project
+make clean      # Remove the binary
+make clean && make  # Full rebuild
+```
+
+Alternatively, compile directly with `gcc`:
+
+```bash
+gcc -Wall -Wextra -g -o shellish shellish-skeleton.c chatroom.c my_cut.c process_tree.c
 ```
 
 ## Running
@@ -43,6 +51,14 @@ sleep 10 &
 ```
 
 The shell will return the prompt immediately without waiting for the process to finish.
+
+When a background process completes, the shell prints a notification:
+
+```
+DONE [12345]
+```
+
+A `SIGCHLD` signal handler automatically reaps finished background processes to prevent zombie processes.
 
 ### I/O Redirection
 
@@ -201,3 +217,4 @@ chatroom myroom alice              chatroom myroom bob
 | `process_tree.c`        | `process_tree` command — visualizes the process hierarchy|
 | `my_cut.c`              | `cut` command — field extraction from stdin               |
 | `chatroom.c`            | `chatroom` command — named-pipe multi-user chat          |
+| `Makefile`              | Build automation — compile and clean targets             |
